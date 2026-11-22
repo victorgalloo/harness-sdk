@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+import httpx
 import pytest
 from a2a.client import ClientConfig
 from a2a.types import AgentCard, Message, Part, Role, TaskState, TextPart
@@ -232,6 +233,55 @@ async def test_get_agent_card_with_client_config_uses_auth_client():
     assert resolver_httpx_client is mock_auth_client, (
         "Bug not fixed: authenticated httpx client was not used for card resolution"
     )
+
+
+def _card_server(requested_urls):
+    """Build an httpx client whose transport serves an agent card and records each requested URL."""
+
+    def handle(request):
+        requested_urls.append(str(request.url))
+        return httpx.Response(
+            200,
+            json={
+                "name": "remote",
+                "description": "remote agent",
+                "url": "http://localhost:8000/a2a/remote",
+                "version": "1.0.0",
+                "capabilities": {},
+                "defaultInputModes": ["text"],
+                "defaultOutputModes": ["text"],
+                "skills": [],
+            },
+        )
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handle))
+
+
+@pytest.mark.asyncio
+async def test_get_agent_card_uses_agent_card_path():
+    """Test that agent_card_path replaces the well-known path during card discovery."""
+    requested_urls = []
+    async with _card_server(requested_urls) as client:
+        agent = A2AAgent(
+            endpoint="http://localhost:8000",
+            agent_card_path="/a2a/remote.json",
+            client_config=ClientConfig(httpx_client=client),
+        )
+        card = await agent.get_agent_card()
+
+    assert requested_urls == ["http://localhost:8000/a2a/remote.json"]
+    assert card.name == "remote"
+
+
+@pytest.mark.asyncio
+async def test_get_agent_card_defaults_to_well_known_path():
+    """Test that card discovery uses the well-known path when agent_card_path is not set."""
+    requested_urls = []
+    async with _card_server(requested_urls) as client:
+        agent = A2AAgent(endpoint="http://localhost:8000", client_config=ClientConfig(httpx_client=client))
+        await agent.get_agent_card()
+
+    assert requested_urls == ["http://localhost:8000/.well-known/agent-card.json"]
 
 
 @pytest.mark.asyncio
