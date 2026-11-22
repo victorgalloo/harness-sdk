@@ -110,6 +110,7 @@ The `A2AAgent` constructor accepts these parameters.
 | `name` | `str` | None | Agent name (auto-populated from agent card if not provided) |
 | `description` | `str` | None | Agent description (auto-populated from agent card if not provided) |
 | `timeout` | `int` | 300 | Timeout for HTTP operations in seconds |
+| `agent_card_path` | `str` | `/.well-known/agent-card.json` | Path to the agent card endpoint, relative to `endpoint` |
 | `client_config` | `ClientConfig` | None | A2A client config for authenticated transport (SigV4, OAuth, bearer tokens); its `httpx_client` handles both card discovery and message sending |
 
 To reach an authenticated endpoint, pass a `ClientConfig` with a configured `httpx_client`. The `a2a_client_factory` parameter is deprecated; use `client_config` instead.
