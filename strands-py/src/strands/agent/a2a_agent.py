@@ -51,6 +51,7 @@ class A2AAgent(AgentBase):
         name: str | None = None,
         description: str | None = None,
         timeout: int = _DEFAULT_TIMEOUT,
+        agent_card_path: str | None = None,
         client_config: ClientConfig | None = None,
         a2a_client_factory: ClientFactory | None = None,
     ):
@@ -61,6 +62,8 @@ class A2AAgent(AgentBase):
             name: Agent name. If not provided, will be populated from agent card.
             description: Agent description. If not provided, will be populated from agent card.
             timeout: Timeout for HTTP operations in seconds (defaults to 300).
+            agent_card_path: Path to the agent card, relative to ``endpoint``. If not provided, the A2A
+                well-known path (``/.well-known/agent-card.json``) is used.
             client_config: A2A ``ClientConfig`` for authentication and transport settings.
                 The ``httpx_client`` configured here is used for both card discovery and
                 message sending, enabling authenticated endpoints (SigV4, OAuth, bearer tokens).
@@ -88,6 +91,7 @@ class A2AAgent(AgentBase):
         self.name = name
         self.description = description
         self.timeout = timeout
+        self.agent_card_path = agent_card_path
         self._client_config: ClientConfig | None = client_config
         self._agent_card: AgentCard | None = None
         self._a2a_client_factory: ClientFactory | None = a2a_client_factory
@@ -207,11 +211,11 @@ class A2AAgent(AgentBase):
 
         if self._client_config is not None and self._client_config.httpx_client is not None:
             resolver = A2ACardResolver(httpx_client=self._client_config.httpx_client, base_url=self.endpoint)
-            self._agent_card = await resolver.get_agent_card()
+            self._agent_card = await resolver.get_agent_card(relative_card_path=self.agent_card_path)
         else:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 resolver = A2ACardResolver(httpx_client=client, base_url=self.endpoint)
-                self._agent_card = await resolver.get_agent_card()
+                self._agent_card = await resolver.get_agent_card(relative_card_path=self.agent_card_path)
 
         # Populate name from card if not set
         if self.name is None and self._agent_card.name is not None:
